@@ -1,0 +1,480 @@
+name: Run Arxiv Papers Daily
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 23 * * *"
+
+env:
+  GITHUB_USER_NAME: Baoyang Zhang
+  GITHUB_USER_EMAIL: byz@stu.pku.edu.cn
+  
+jobs:
+  build:
+    name: update
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        
+      - name: Set up Python Env
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install arxiv requests pyyaml markdown beautifulsoup4
+          # Install WeasyPrint and its dependencies
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-dev \
+            python3-pip \
+            libcairo2 \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            libgdk-pixbuf2.0-0 \
+            libffi-dev \
+            shared-mime-info
+          pip install weasyprint
+          # Install Chinese font support
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          
+      - name: Run arxiv-daily.py
+        run: |
+          python arxiv-daily.py
+          
+      - name: Convert arxiv-daily.md to enhanced HTML with interactive bookmarks
+        run: |
+          # Create enhanced HTML version with interactive PDF bookmarks
+          cat > convert_to_pdf.py << 'EOF'
+          import subprocess
+          import datetime
+          import markdown
+          import re
+          from bs4 import BeautifulSoup
+          import urllib.parse
+          
+          # Read arxiv-daily.md content
+          with open('arxiv-daily.md', 'r', encoding='utf-8') as f:
+              markdown_content = f.read()
+          
+          # Convert Markdown to HTML while preserving all formatting
+          html_body = markdown.markdown(
+              markdown_content, 
+              extensions=['extra', 'tables', 'fenced_code']
+          )
+          
+          # Process HTML to add IDs for bookmark linking
+          soup = BeautifulSoup(html_body, 'html.parser')
+          
+          # Add IDs to all headers for bookmark linking
+          header_counter = 0
+          for header in soup.find_all(['h1', 'h2', 'h3']):
+              header_text = header.get_text().strip()
+              # Create URL-friendly ID
+              header_id = re.sub(r'[^a-zA-Z0-9]+', '-', header_text.lower())
+              header_id = re.sub(r'-+', '-', header_id).strip('-')
+              if not header_id:
+                  header_id = f'header-{header_counter}'
+              header['id'] = header_id
+              header_counter += 1
+          
+          html_body = str(soup)
+          
+          # Create complete HTML document with enhanced styling and interactive bookmarks
+          html_content = f'''
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Arxiv Daily Update - {datetime.date.today()}</title>
+              <style>
+                  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+                  
+                  body {{
+                      font-family: 'Inter', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      max-width: 1200px;
+                      margin: 0 auto;
+                      padding: 20px;
+                      background-color: #fff;
+                  }}
+                  
+                  /* Enhanced PDF Bookmark support with explicit linking */
+                  h1, h2, h3 {{
+                      bookmark-level: 1;
+                      -weasy-bookmark-level: 1;
+                  }}
+                  
+                  h1 {{
+                      bookmark-label: attr(id);
+                      -weasy-bookmark-label: attr(id);
+                  }}
+                  
+                  h2 {{
+                      bookmark-level: 2;
+                      -weasy-bookmark-level: 2;
+                      bookmark-label: attr(id);
+                      -weasy-bookmark-label: attr(id);
+                  }}
+                  
+                  h3 {{
+                      bookmark-level: 3;
+                      -weasy-bookmark-level: 3;
+                      bookmark-label: attr(id);
+                      -weasy-bookmark-label: attr(id);
+                  }}
+                  
+                  /* Preserve all original Markdown styling */
+                  h1, h2, h3, h4, h5, h6 {{
+                      color: #2c3e50;
+                      margin-top: 1.5em;
+                      margin-bottom: 0.5em;
+                      border-bottom: none !important;
+                      scroll-margin-top: 20px; /* For smooth scrolling */
+                  }}
+                  
+                  h1 {{
+                      font-size: 2em;
+                      font-weight: 700;
+                      color: #1a0dab;
+                  }}
+                  
+                  h2 {{
+                      font-size: 1.5em;
+                      font-weight: 600;
+                      color: #1a0dab;
+                  }}
+                  
+                  /* Enhanced paper list styling */
+                  .paper-list {{
+                      list-style-type: none;
+                      padding: 0;
+                      margin: 0;
+                  }}
+                  
+                  .paper-item {{
+                      padding: 20px;
+                      margin: 20px 0;
+                      border-radius: 10px;
+                      border-left: 5px solid #ddd;
+                      page-break-inside: avoid;
+                  }}
+                  
+                  .paper-item-odd {{
+                      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                      border-left-color: #4285f4;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }}
+                  
+                  .paper-item-even {{
+                      background: linear-gradient(135deg, #ffffff 0%, #f1f3f4 100%);
+                      border-left-color: #34a853;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }}
+                  
+                  .paper-header {{
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: flex-start;
+                      margin-bottom: 12px;
+                  }}
+                  
+                  .paper-title {{
+                      font-weight: 600;
+                      font-size: 1.1em;
+                      margin: 0;
+                      flex: 1;
+                      color: #1a0dab;
+                      line-height: 1.4;
+                  }}
+                  
+                  .paper-date {{
+                      color: #5f6368;
+                      font-size: 0.9em;
+                      white-space: nowrap;
+                      margin-left: 20px;
+                      font-weight: 500;
+                  }}
+                  
+                  .paper-authors {{
+                      color: #555;
+                      font-style: italic;
+                      margin-bottom: 8px;
+                      font-size: 0.95em;
+                  }}
+                  
+                  .paper-meta {{
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      font-size: 0.9em;
+                      color: #666;
+                      margin-top: 8px;
+                  }}
+                  
+                  .paper-categories {{
+                      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                      padding: 4px 8px;
+                      border-radius: 6px;
+                      font-size: 0.85em;
+                      font-weight: 500;
+                  }}
+                  
+                  .paper-link {{
+                      color: #1a73e8;
+                      text-decoration: none;
+                      font-weight: 500;
+                      background: rgba(26, 115, 232, 0.1);
+                      padding: 4px 8px;
+                      border-radius: 4px;
+                      transition: all 0.3s ease;
+                  }}
+                  
+                  .paper-link:hover {{
+                      background: rgba(26, 115, 232, 0.2);
+                      text-decoration: underline;
+                  }}
+                  
+                  .paper-comments {{
+                      color: #d93025;
+                      font-size: 0.9em;
+                      margin-top: 8px;
+                      white-space: pre-wrap;
+                      word-wrap: break-word;
+                      background: rgba(217, 48, 37, 0.05);
+                      padding: 8px;
+                      border-radius: 4px;
+                      border-left: 3px solid #d93025;
+                  }}
+                  
+                  .paper-abstract {{
+                      margin-top: 12px;
+                      font-size: 0.92em;
+                      line-height: 1.5;
+                      color: #555;
+                      white-space: pre-wrap;
+                      word-wrap: break-word;
+                      background: rgba(52, 168, 83, 0.05);
+                      padding: 12px;
+                      border-radius: 6px;
+                      border-left: 3px solid #34a853;
+                  }}
+                  
+                  .abstract-label {{
+                      font-weight: 600;
+                      color: #2e7d32;
+                      margin-bottom: 6px;
+                      font-size: 0.95em;
+                  }}
+                  
+                  /* Table styling */
+                  table {{
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin: 20px 0;
+                      border: 1px solid #ddd;
+                  }}
+                  
+                  th, td {{
+                      padding: 12px;
+                      text-align: left;
+                      border: 1px solid #ddd;
+                  }}
+                  
+                  th {{
+                      background-color: #f8f9fa;
+                      font-weight: 600;
+                  }}
+                  
+                  /* Code and pre styling */
+                  code {{
+                      background-color: #f1f3f4;
+                      padding: 2px 4px;
+                      border-radius: 3px;
+                      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                  }}
+                  
+                  pre {{
+                      background-color: #f8f9fa;
+                      padding: 15px;
+                      border-radius: 5px;
+                      overflow-x: auto;
+                      border-left: 4px solid #4285f4;
+                  }}
+                  
+                  pre code {{
+                      background: none;
+                      padding: 0;
+                  }}
+                  
+                  /* Link styling */
+                  a {{
+                      color: #1a73e8;
+                      text-decoration: none;
+                  }}
+                  
+                  a:hover {{
+                      text-decoration: underline;
+                  }}
+                  
+                  /* Blockquote styling */
+                  blockquote {{
+                      border-left: 4px solid #4285f4;
+                      padding-left: 15px;
+                      margin-left: 0;
+                      color: #666;
+                      background-color: #f8f9fa;
+                      padding: 10px 15px;
+                      border-radius: 0 5px 5px 0;
+                  }}
+                  
+                  /* Math formula styling */
+                  .math {{
+                      font-family: "Cambria Math", "STIX Two Math", serif;
+                  }}
+                  
+                  /* List styling */
+                  ul, ol {{
+                      padding-left: 20px;
+                  }}
+                  
+                  li {{
+                      margin-bottom: 5px;
+                  }}
+                  
+                  /* Print optimization with enhanced bookmark support */
+                  @media print {{
+                      body {{
+                          padding: 10px;
+                          font-size: 12pt;
+                      }}
+                      
+                      .paper-item {{
+                          page-break-inside: avoid;
+                          break-inside: avoid;
+                          margin: 15px 0;
+                      }}
+                      
+                      h1, h2, h3 {{
+                          page-break-after: avoid;
+                      }}
+                      
+                      a {{
+                          color: #1a0dab !important;
+                          text-decoration: none !important;
+                      }}
+                      
+                      /* Enhanced PDF bookmark support for print */
+                      h1, h2, h3 {{
+                          bookmark-level: 1;
+                          -weasy-bookmark-level: 1;
+                      }}
+                      
+                      h2 {{
+                          bookmark-level: 2;
+                          -weasy-bookmark-level: 2;
+                      }}
+                      
+                      h3 {{
+                          bookmark-level: 3;
+                          -weasy-bookmark-level: 3;
+                      }}
+                      
+                      /* Ensure URLs are visible in print */
+                      a[href]:after {{
+                          content: " (" attr(href) ")";
+                          font-size: 0.9em;
+                          color: #666;
+                      }}
+                  }}
+              </style>
+          </head>
+          <body>
+              {html_body}
+          </body>
+          </html>
+          '''
+          
+          # Save HTML file
+          with open('arxiv-daily_enhanced.html', 'w', encoding='utf-8') as f:
+              f.write(html_content)
+          
+          print("Enhanced HTML file created successfully with interactive PDF bookmarks!")
+          EOF
+          
+          python convert_to_pdf.py
+          
+      - name: Convert HTML to PDF using WeasyPrint with interactive bookmarks
+        run: |
+          # Generate high-quality PDF using WeasyPrint with interactive bookmark support
+          python -c "
+          from weasyprint import HTML
+          import os
+          
+          # Set environment variables for font support
+          os.environ['FONTCONFIG_PATH'] = '/etc/fonts'
+          
+          # Generate PDF with explicit bookmark configuration
+          HTML('arxiv-daily_enhanced.html').write_pdf(
+              'arxiv-daily.pdf',
+              optimize_size=('fonts', 'images'),
+              presentational_hints=True,
+              stylesheets=None
+          )
+          print('PDF generated successfully with WeasyPrint including interactive bookmarks!')
+          "
+          
+      - name: Send email with PDF
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.163.com
+          server_port: 465
+          username: ${{ secrets.SENDER_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "[Arxiv Daily Update] ${{ steps.date.outputs.today }}"
+          body: |
+            Hello,
+            
+            Your daily arxiv update is ready. Please find the PDF report attached.
+            
+            Generated at ${{ steps.date.outputs.today }}.
+            
+            This PDF features:
+            • Perfect HTML/CSS rendering
+            • Preserved Markdown formatting
+            • Math formula support
+            • Chinese and special character support
+            • Enhanced paper styling
+            • Interactive table of contents with clickable bookmarks
+            
+            ---
+            Automatic email from GitHub Actions
+          to: ${{ secrets.RECIPIENT_EMAIL }}
+          from: "Arxiv Daily Bot <${{ secrets.SENDER_EMAIL }}>"
+          attachments: arxiv-daily.pdf
+
+      - name: Push updated files
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "[GitHub Action] Automatic Daily Update ${{ steps.date.outputs.today }}"
+          file_pattern: |
+            docs/arxiv-daily.json
+            arxiv-daily.md
+            docs/arxiv-daily-web.json
+            docs/gitpage.md
+            arxiv-daily_enhanced.html
+            arxiv-daily.pdf
+          commit_user_name: ${{ env.GITHUB_USER_NAME }}
+          commit_user_email: ${{ env.GITHUB_USER_EMAIL }}

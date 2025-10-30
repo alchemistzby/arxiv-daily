@@ -1,0 +1,44 @@
+# TODO: add papers by configuration file
+
+# Base URL for arXiv API (currently commented out as we're using arxiv library directly)
+base_url: "https://arxiv.paperswithcode.com/api/v0/papers/"
+
+
+max_results: 10             # Maximum number of papers to fetch per keyword
+show_abstract: True         # Whether to include abstracts in the output
+
+# Publication flags - set to True to generate corresponding output files
+publish_readme: True        # Generate README.md for GitHub
+publish_gitpage: False       # Generate gitpage.md for web deployment
+
+# Custom date range configuration (automatically disables cleanup when enabled)
+date_range:
+  enabled: false             # Enable custom date range filtering
+  start_date: "2025-07-01"  # Optional: start date for paper search (YYYY-MM-DD format)
+  end_date: "2025-08-01"    # Optional: end date for paper search (YYYY-MM-DD format)
+
+# Cleanup configuration for managing storage of papers
+cleanup:
+  enabled: true             # Enable automatic cleanup of old papers
+  keep_days: 31             # Number of days to keep papers before cleanup
+
+# File paths for output files
+json_readme_path: './docs/arxiv-daily.json'        # JSON file for README data storage
+json_gitpage_path: './docs/arxiv-daily-web.json'   # JSON file for gitpage data storage
+
+md_readme_path: 'arxiv-daily.md'           # Output markdown file for GitHub README
+md_gitpage_path: './docs/gitpage.md'  # Output markdown file for web deployment
+
+# Research keywords and their search filters
+# Each keyword represents a research topic with associated search terms
+keywords:
+    "Quantum Koopman Method":
+        filters: ["Quantum Koopman", "quantum Koopman operator", "Koopman quantum", "quantum dynamical systems", "Koopman operator", "Koopman theory"]
+    "Quantum Machine Learning":
+        filters: ["quantum machine learning", "quantum neural networks", "quantum algorithms", "QML"]
+    "ROM":
+        filters: ["reduced order model", "model order reduction", "ROM", "proper orthogonal decomposition", "POD"]
+    "PINN":
+        filters: ["physics-informed neural networks", "PINN", "physics-informed machine learning"]
+    "Turbulence and Fluid Dynamics":
+        filters: ["QCFD", "turbulence", "fluid dynamics", "Navier-Stokes", "turbulent", ]
