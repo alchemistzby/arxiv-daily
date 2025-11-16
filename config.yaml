@@ -32,13 +32,9 @@ md_gitpage_path: './docs/gitpage.md'  # Output markdown file for web deployment
 # Research keywords and their search filters
 # Each keyword represents a research topic with associated search terms
 keywords:
-    "Quantum Koopman Method":
-        filters: ["Quantum Koopman", "quantum Koopman operator", "Koopman quantum", "quantum dynamical systems", "Koopman operator", "Koopman theory"]
-    "Quantum Machine Learning":
-        filters: ["quantum machine learning", "quantum neural networks", "quantum algorithms", "QML"]
+    "QML":
+        filters: ["quantum machine learning", "quantum neural networks", "QCFD", "variational quantum circuits"]
     "ROM":
         filters: ["reduced order model", "model order reduction", "ROM", "proper orthogonal decomposition", "POD"]
     "PINN":
         filters: ["physics-informed neural networks", "PINN", "physics-informed machine learning"]
-    "Turbulence and Fluid Dynamics":
-        filters: ["QCFD", "turbulence", "fluid dynamics", "Navier-Stokes", "turbulent", ]

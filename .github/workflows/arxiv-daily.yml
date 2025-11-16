@@ -3,7 +3,7 @@ name: Run Arxiv Papers Daily
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 23 * * *"
+    - cron: "0 0 */3 * *"
 
 env:
   GITHUB_USER_NAME: Baoyang Zhang
@@ -24,8 +24,8 @@ jobs:
           python-version: '3.10'
 
       - name: Get current date
-        id: date
-        run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
+        id: date_setter
+        run: echo "today=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
@@ -443,13 +443,13 @@ jobs:
           server_port: 465
           username: ${{ secrets.SENDER_EMAIL }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "[Arxiv Daily Update] ${{ steps.date.outputs.today }}"
+          subject: "[Arxiv Daily Update] ${{ steps.date_setter.outputs.today }}"
           body: |
             Hello,
             
             Your daily arxiv update is ready. Please find the PDF report attached.
             
-            Generated at ${{ steps.date.outputs.today }}.
+            Generated at ${{ steps.date_setter.outputs.today }}.
             
             This PDF features:
             • Perfect HTML/CSS rendering
@@ -465,16 +465,16 @@ jobs:
           from: "Arxiv Daily Bot <${{ secrets.SENDER_EMAIL }}>"
           attachments: arxiv-daily.pdf
 
-      - name: Push updated files
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "[GitHub Action] Automatic Daily Update ${{ steps.date.outputs.today }}"
-          file_pattern: |
-            docs/arxiv-daily.json
-            arxiv-daily.md
-            docs/arxiv-daily-web.json
-            docs/gitpage.md
-            arxiv-daily_enhanced.html
-            arxiv-daily.pdf
-          commit_user_name: ${{ env.GITHUB_USER_NAME }}
-          commit_user_email: ${{ env.GITHUB_USER_EMAIL }}
+    #   - name: Push updated files
+    #     uses: stefanzweifel/git-auto-commit-action@v4
+    #     with:
+    #       commit_message: "[GitHub Action] Automatic Daily Update ${{ steps.date_setter.outputs.today }}"
+    #       file_pattern: |
+    #         docs/arxiv-daily.json
+    #         arxiv-daily.md
+    #         docs/arxiv-daily-web.json
+    #         docs/gitpage.md
+    #         arxiv-daily_enhanced.html
+    #         arxiv-daily.pdf
+    #       commit_user_name: ${{ env.GITHUB_USER_NAME }}
+    #       commit_user_email: ${{ env.GITHUB_USER_EMAIL }}
