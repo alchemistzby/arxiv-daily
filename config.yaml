@@ -4,7 +4,7 @@
 base_url: "https://arxiv.paperswithcode.com/api/v0/papers/"
 
 
-max_results: 10             # Maximum number of papers to fetch per keyword
+max_results: 20             # Maximum number of papers to fetch per keyword
 show_abstract: True         # Whether to include abstracts in the output
 
 # Publication flags - set to True to generate corresponding output files
@@ -20,7 +20,7 @@ date_range:
 # Cleanup configuration for managing storage of papers
 cleanup:
   enabled: true             # Enable automatic cleanup of old papers
-  keep_days: 31             # Number of days to keep papers before cleanup
+  keep_days: 3             # Number of days to keep papers before cleanup
 
 # File paths for output files
 json_readme_path: './docs/arxiv-daily.json'        # JSON file for README data storage
@@ -32,9 +32,13 @@ md_gitpage_path: './docs/gitpage.md'  # Output markdown file for web deployment
 # Research keywords and their search filters
 # Each keyword represents a research topic with associated search terms
 keywords:
+    "QCFD":
+        filters: ["quantum computational fluid dynamics", "QCFD", "quantum simulation"]
     "QML":
-        filters: ["quantum machine learning", "quantum neural networks", "QCFD", "variational quantum circuits"]
-    "ROM":
-        filters: ["reduced order model", "model order reduction", "ROM", "proper orthogonal decomposition", "POD"]
-    "PINN":
-        filters: ["physics-informed neural networks", "PINN", "physics-informed machine learning"]
+        filters: ["quantum machine learning", "quantum neural networks", "variational quantum"]
+    "QC1":
+        filters: ["LCHS", "linear combination of Hamiltionian simulation", "Carleman", "Koopman"]
+    "QC2":
+        filters: ["quantum computing", "quantum algorithm"]
+    "AI4S":
+        filters: ["physics-informed neural networks", "neural operator", "physics-informed machine learning"]

@@ -12,6 +12,7 @@ usage: python main.py --config_path config.yaml
 
 import os
 import re
+import time
 import json
 import arxiv
 import yaml
@@ -26,7 +27,7 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 
-arxiv_url = "http://arxiv.org/"
+arxiv_url = "https://arxiv.org/"
 
 def load_config(config_file: str) -> dict:
     '''
@@ -60,7 +61,7 @@ def load_config(config_file: str) -> dict:
         config['kv'] = pretty_filters(**config)
         logging.info(f'Keywords: {list(config["keywords"].keys())}')
         logging.info(f'Max results per keyword: {config["max_results"]}')
-        
+
         # Load show_abstract configuration
         config['show_abstract'] = config.get('show_abstract', False)
         logging.info(f'Show abstract: {config["show_abstract"]}')
@@ -132,7 +133,7 @@ def sort_papers(papers):
         output[key] = papers[key]
     return output
 
-def get_daily_papers(topic, query="slam", max_results=2, start_date=None, end_date=None, show_abstract=False):
+def get_daily_papers(topic, query="slam", max_results=2, start_date=None, end_date=None, show_abstract=False, client=None):
     """
     Fetch papers from arXiv based on search criteria
     @param topic: research topic name
@@ -168,7 +169,13 @@ def get_daily_papers(topic, query="slam", max_results=2, start_date=None, end_da
             full_query = f"({query}) AND submittedDate:[19910101 TO {end_str}]"
 
         # Use new arxiv API to avoid deprecation warnings
-        client = arxiv.Client()
+
+        if client is None:
+            client = arxiv.Client(
+                delay_seconds=5.0,
+                num_retries=5
+            )
+
         search = arxiv.Search(
             query=full_query,
             max_results=max_results,
@@ -416,27 +423,27 @@ def json_to_md(filename, md_filename,
         match = re.search(r"\$.*\$", s)
         if match is None:
             return s
-            
+
         math_start, math_end = match.span()
         math_content = match.group()[1:-1]  # Remove $ signs
-        
+
         # Process the part before math
         before_math = s[:math_start]
         # Process the part after math
         after_math = s[math_end:]
-        
+
         # Check if we need to add spaces around the math expression
         space_before = ''
         space_after = ''
-        
+
         # Check character before math (if exists)
         if before_math and not before_math[-1].isspace() and before_math[-1] != '*':
             space_before = ' '
-            
+
         # Check character after math (if exists)
         if after_math and not after_math[0].isspace() and after_math[0] != '*':
             space_after = ' '
-        
+
         # Reconstruct the string with proper spacing
         ret = before_math + space_before + '$' + math_content.strip() + '$' + space_after + after_math
         return ret
@@ -584,7 +591,7 @@ def json_to_md(filename, md_filename,
             # Start paper list
             if to_web == False:  # For README, use styled list
                 f.write('<div class="paper-list">\n')
-                
+
                 paper_index = 0
                 day_content_list = list(day_content.items())
                 for paper_key, v in day_content_list:
@@ -609,7 +616,7 @@ def json_to_md(filename, md_filename,
                                 pdf_link = parts[5].strip()
                                 comments = parts[6].strip()
                                 abstract = ""
-                            
+
                             # Extract PDF link and ID
                             pdf_match = re.search(r'\[(.*?)\]\((.*?)\)', pdf_link)
                             if pdf_match:
@@ -618,48 +625,48 @@ def json_to_md(filename, md_filename,
                             else:
                                 paper_id = "PDF"
                                 paper_url = "#"
-                            
+
                             # Create styled list item with alternating classes
                             paper_index += 1
                             item_class = "paper-item-odd" if paper_index % 2 == 1 else "paper-item-even"
                             f.write(f'<div class="paper-item {item_class}">\n')
-                            
+
                             # Header with title and date
                             f.write('  <div class="paper-header">\n')
                             f.write(f'    <div class="paper-title">{pretty_math(title)}</div>\n')
                             f.write(f'    <div class="paper-date">{date}</div>\n')
                             f.write('  </div>\n')
-                            
+
                             # Authors with "last author:" label
                             if last_author:
                                 f.write(f'  <div class="paper-authors">{last_author} (last author)</div>\n')
-                            
+
                             # Metadata: categories and PDF link
                             f.write('  <div class="paper-meta">\n')
                             if categories:
                                 f.write(f'    <span class="paper-categories">{categories}</span>\n')
                             f.write(f'    <a class="paper-link" href="{paper_url}" target="_blank">📄 PDF: {paper_id}</a>\n')
                             f.write('  </div>\n')
-                            
+
                             # Comments - show complete comments without truncation
                             if comments and comments != "":
                                 f.write(f'  <div class="paper-comments">💬 {comments}</div>\n')
-                            
+
                             # Abstract (if enabled and available) - show complete abstract without truncation
                             if show_abstract and abstract and abstract != "":
                                 f.write(f'  <div class="paper-abstract">\n')
                                 f.write(f'    <div class="abstract-label">📖 Abstract:</div>\n')
                                 f.write(f'    {pretty_math(abstract)}\n')
                                 f.write(f'  </div>\n')
-                            
+
                             f.write('</div>\n')
-                            
+
                             # Add extra space between papers (except for the last one)
                             if paper_index < len(day_content_list):
                                 f.write('<div style="height: 10px;"></div>\n')
-                
+
                 f.write('</div>\n\n')
-                
+
             else:  # For web (GitPage), keep original format
                 if use_title == True:
                     if to_web == False:
@@ -696,6 +703,11 @@ def demo(**config):
     Main function to fetch papers and update output files
     @param config: configuration dictionary
     """
+    client = arxiv.Client(
+        delay_seconds=5.0,
+        num_retries=5
+    )
+
     data_collector = []
 
     keywords = config['kv']
@@ -729,11 +741,12 @@ def demo(**config):
 
     # Fetch new papers
     total_new_papers = 0
+
     for topic, keyword in keywords.items():
         # Pass date range parameters and show_abstract
         data = get_daily_papers(topic, query=keyword, max_results=max_results,
                                start_date=start_date, end_date=end_date,
-                               show_abstract=show_abstract)
+                               show_abstract=show_abstract, client=client,)
 
         if topic in data and data[topic]:
             papers_count = len(data[topic])
